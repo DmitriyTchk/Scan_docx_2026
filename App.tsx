@@ -29,7 +29,7 @@ const App: React.FC = () => {
 
   // Debug
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [showConsole, setShowConsole] = useState(false); // Default off now
+  const [showConsole, setShowConsole] = useState(false);
 
   // Data
   const [currentTable, setCurrentTable] = useState<TableData | null>(null);
@@ -88,14 +88,11 @@ const App: React.FC = () => {
       };
       
       setCurrentTable(newTable);
-      saveTable(newTable); // Auto-save initial scan
+      saveTable(newTable); 
       setView('editor');
       setStatus(AppStatus.SUCCESS);
-      
-      // Removed auto-wizard open to let user review first
       setFeedback("Review data, then click 'Pipeline' to set up voice guide.");
       setTimeout(() => setFeedback(null), 4000);
-
     } catch (error: any) {
       log(error.message, 'error');
       setStatus(AppStatus.ERROR);
@@ -109,14 +106,11 @@ const App: React.FC = () => {
 
   const handleSaveWorkflow = (plan: WorkflowPlan) => {
       if(!currentTable) return;
-      
-      // Save plan to table structure
       const updatedTable = { ...currentTable, workflowPlan: plan, lastModified: Date.now() };
       setCurrentTable(updatedTable);
       saveTable(updatedTable);
-      
       setShowWorkflowWizard(false);
-      setActiveWorkflow(plan); // Start immediate
+      setActiveWorkflow(plan); 
   };
 
   const handleVoiceUpdate = (result: VoiceUpdateResult) => {
@@ -139,9 +133,9 @@ const App: React.FC = () => {
     if (!currentTable) return;
     const newRows = [...currentTable.rows];
     newRows[rowIndex] = { ...newRows[rowIndex], [colId]: val };
-    setCurrentTable({ ...currentTable, rows: newRows, lastModified: Date.now() });
-    // Debounce save in real app, immediate here for simplicity
-    saveTable({ ...currentTable, rows: newRows, lastModified: Date.now() }); 
+    const updated = { ...currentTable, rows: newRows, lastModified: Date.now() };
+    setCurrentTable(updated);
+    saveTable(updated); 
   };
 
   const handleGuidedValue = (rowIndex: number, colId: string, val: string) => {
@@ -153,8 +147,9 @@ const App: React.FC = () => {
           newRows[rowIndex] = newRow;
       }
       newRows[rowIndex] = { ...newRows[rowIndex], [colId]: val };
-      setCurrentTable({ ...currentTable, rows: newRows, lastModified: Date.now() });
-      saveTable({ ...currentTable, rows: newRows, lastModified: Date.now() });
+      const updated = { ...currentTable, rows: newRows, lastModified: Date.now() };
+      setCurrentTable(updated);
+      saveTable(updated);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -163,8 +158,7 @@ const App: React.FC = () => {
       if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onloadend = () => {
-            const resultStr = reader.result as string;
-            const base64 = resultStr.split(',')[1]; 
+            const base64 = (reader.result as string).split(',')[1]; 
             processImage(base64, file.type);
         };
         reader.readAsDataURL(file);
@@ -186,96 +180,67 @@ const App: React.FC = () => {
       
       <DebugConsole logs={logs} isOpen={showConsole} onClose={() => setShowConsole(false)} />
 
-      {/* Top Right Controls: Home + Language */}
-      <div className="fixed top-4 right-4 z-50 flex items-center gap-4">
-          {view !== 'home' && (
-              <button 
-                onClick={() => setView('home')}
-                className="bg-white p-2 rounded-full shadow-sm border border-slate-200 text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition-colors"
-                title={language === 'ru' ? "На главную" : "Home"}
-              >
-                  <Home size={18} />
-              </button>
-          )}
-
-          <div className="flex bg-white rounded-full shadow-sm p-1 border border-slate-200">
-              <button 
-                onClick={() => setLanguage('en')}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${language === 'en' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
-              >
-                  EN
-              </button>
-              <button 
-                onClick={() => setLanguage('ru')}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${language === 'ru' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
-              >
-                  RU
-              </button>
-          </div>
-      </div>
+      {/* Global (Home-only) floating controls - Moved inside conditional views below to avoid Editor overlap */}
 
       {view === 'history' ? (
         <History onSelect={(t) => { setCurrentTable(t); setView('editor'); }} onBack={() => setView('home')} />
       ) : view === 'editor' && currentTable ? (
         <div className="h-screen flex flex-col bg-slate-50">
-          <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm sticky top-0 z-20">
-            <div className="flex items-center gap-2">
-              <button onClick={() => setView('home')} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-full">
+          <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center shadow-sm sticky top-0 z-20 gap-4">
+            {/* Left Section: Back & Title */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <button onClick={() => setView('home')} className="p-2 -ml-2 text-slate-600 hover:bg-slate-100 rounded-full flex-shrink-0">
                 <ArrowLeft size={20} />
               </button>
-              <div className="overflow-hidden">
+              <div className="min-w-0">
                 <input 
                   value={currentTable.name} 
                   onChange={(e) => setCurrentTable({...currentTable, name: e.target.value})}
-                  className="font-bold text-slate-800 bg-transparent focus:bg-slate-100 outline-none rounded px-1 w-full truncate"
+                  className="font-bold text-slate-800 bg-transparent focus:bg-slate-100 outline-none rounded px-1 w-full truncate text-sm sm:text-base"
                 />
               </div>
             </div>
-            {/* Increased right margin to prevent overlap with fixed buttons */}
-            <div className="flex gap-2 mr-32 sm:mr-40"> 
+
+            {/* Right Section: All controls integrated */}
+            <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
                <button 
                  onClick={() => setShowConsole(!showConsole)}
                  className={`p-2 rounded-full transition-colors ${showConsole ? 'bg-slate-800 text-green-400' : 'text-slate-600 hover:bg-slate-100'}`}
                  title="System Log"
                >
-                 <Terminal size={20} />
+                 <Terminal size={18} />
                </button>
-               <button onClick={() => setShowWorkflowWizard(true)} className="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-full border border-purple-200">
-                 <Sparkles size={20} />
+
+               <button 
+                  onClick={() => setShowWorkflowWizard(true)} 
+                  className="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-full border border-purple-100"
+                  title="Pipeline"
+               >
+                 <Sparkles size={18} />
                </button>
-               <button onClick={() => setShowColumnSettings(true)} className="p-2 text-slate-600 hover:bg-slate-100 rounded-full">
-                 <Settings size={20} />
+
+               <button 
+                  onClick={() => setShowColumnSettings(true)} 
+                  className="p-2 text-slate-600 hover:bg-slate-100 rounded-full"
+                  title="Settings"
+               >
+                 <Settings size={18} />
                </button>
+
+               <div className="h-6 w-px bg-slate-200 mx-1 hidden sm:block"></div>
+
+               <div className="flex bg-slate-100 rounded-full p-0.5 border border-slate-200">
+                  <button 
+                    onClick={() => setLanguage('en')}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${language === 'en' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}
+                  >EN</button>
+                  <button 
+                    onClick={() => setLanguage('ru')}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${language === 'ru' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}
+                  >RU</button>
+               </div>
             </div>
           </header>
-
-          {/* Processing Overlay */}
-          {status === AppStatus.PROCESSING && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-              <div className="bg-white p-6 rounded-2xl shadow-2xl flex flex-col items-center max-w-sm w-full mx-4">
-                <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
-                <h3 className="text-lg font-bold text-slate-800 mb-2">{t.processing}</h3>
-                <p className="text-slate-500 text-sm text-center mb-6">
-                  {language === 'ru' ? 'Это может занять некоторое время...' : 'This might take a moment...'}
-                </p>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden relative">
-                  <div className="absolute top-0 bottom-0 left-0 w-1/2 bg-blue-600 rounded-full animate-progress"></div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Toast Feedback for Success/Error (Hidden during Processing) */}
-          {feedback && status !== AppStatus.PROCESSING && status !== AppStatus.IDLE && (
-              <div className="absolute top-16 left-0 right-0 z-30 flex justify-center px-4 animate-in slide-in-from-top-5 fade-in">
-                   <div className={`px-4 py-2 rounded-lg text-sm shadow-md transition-all text-center ${
-                       status === AppStatus.ERROR ? 'bg-red-500 text-white' : 
-                       status === AppStatus.SUCCESS ? 'bg-green-500 text-white' : 'bg-slate-800 text-white'
-                   }`}>
-                       {feedback}
-                   </div>
-              </div>
-          )}
 
           <div className="flex-1 overflow-auto relative">
              <div className="min-w-full inline-block align-middle pb-24">
@@ -321,7 +286,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Voice Control (General) - Only show if not in guided mode AND Camera is closed */}
           {!activeWorkflow && !showCamera && (
             <VoiceControl 
                 tableData={currentTable}
@@ -370,15 +334,31 @@ const App: React.FC = () => {
       ) : (
         <div className="flex-1 flex flex-col p-6 max-w-md mx-auto w-full justify-center relative">
             
-            {/* Full screen overlay for processing on home screen too */}
+            {/* Top Bar for Home View */}
+            <div className="fixed top-4 right-4 z-50 flex items-center gap-3">
+                <button 
+                  onClick={() => setShowConsole(!showConsole)}
+                  className={`p-2.5 rounded-full shadow-sm border border-slate-200 transition-colors ${showConsole ? 'bg-slate-800 text-green-400 border-slate-800' : 'bg-white text-slate-500 hover:text-blue-600'}`}
+                >
+                    <Terminal size={18} />
+                </button>
+                <div className="flex bg-white rounded-full shadow-sm p-1 border border-slate-200">
+                    <button 
+                      onClick={() => setLanguage('en')}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${language === 'en' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}
+                    >EN</button>
+                    <button 
+                      onClick={() => setLanguage('ru')}
+                      className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${language === 'ru' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}
+                    >RU</button>
+                </div>
+            </div>
+
             {status === AppStatus.PROCESSING && (
               <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm rounded-3xl">
                 <div className="flex flex-col items-center p-6 text-center">
                     <Loader2 className="w-12 h-12 text-blue-600 animate-spin mb-4" />
                     <h3 className="text-xl font-bold text-slate-800 mb-2">{t.processing}</h3>
-                    <div className="w-48 bg-slate-200 h-2 rounded-full overflow-hidden mt-2 relative">
-                         <div className="absolute top-0 bottom-0 left-0 w-1/3 bg-blue-600 rounded-full animate-progress"></div>
-                    </div>
                 </div>
               </div>
             )}
@@ -394,20 +374,20 @@ const App: React.FC = () => {
             </div>
 
             <div className="grid gap-4 w-full">
-                <button onClick={() => setShowSourceModal(true)} className="group relative flex items-center p-4 bg-white rounded-2xl shadow-sm border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all active:scale-95">
+                <button onClick={() => setShowSourceModal(true)} className="group relative flex items-center p-4 bg-white rounded-2xl shadow-sm border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all active:scale-95 text-left">
                     <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 mr-4 group-hover:bg-blue-600 group-hover:text-white transition-colors"><Camera size={24} /></div>
-                    <div className="text-left"><h3 className="font-bold text-slate-800">{t.scanTable}</h3><p className="text-xs text-slate-400">{t.scanDesc}</p></div>
+                    <div><h3 className="font-bold text-slate-800">{t.scanTable}</h3><p className="text-xs text-slate-400">{t.scanDesc}</p></div>
                 </button>
 
-                <button onClick={() => fileInputRef.current?.click()} className="group relative flex items-center p-4 bg-white rounded-2xl shadow-sm border border-slate-200 hover:border-indigo-500 hover:shadow-md transition-all active:scale-95">
+                <button onClick={() => fileInputRef.current?.click()} className="group relative flex items-center p-4 bg-white rounded-2xl shadow-sm border border-slate-200 hover:border-indigo-500 hover:shadow-md transition-all active:scale-95 text-left">
                     <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 mr-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors"><FileUp size={24} /></div>
-                    <div className="text-left"><h3 className="font-bold text-slate-800">{t.uploadFile}</h3><p className="text-xs text-slate-400">{t.uploadDesc}</p></div>
+                    <div><h3 className="font-bold text-slate-800">{t.uploadFile}</h3><p className="text-xs text-slate-400">{t.uploadDesc}</p></div>
                     <input type="file" accept="image/*,.csv,.xlsx" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
                 </button>
 
-                <button onClick={handleCreateNew} className="group relative flex items-center p-4 bg-white rounded-2xl shadow-sm border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all active:scale-95">
+                <button onClick={handleCreateNew} className="group relative flex items-center p-4 bg-white rounded-2xl shadow-sm border border-slate-200 hover:border-emerald-500 hover:shadow-md transition-all active:scale-95 text-left">
                     <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mr-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors"><Grid3X3 size={24} /></div>
-                    <div className="text-left"><h3 className="font-bold text-slate-800">{t.newTemplate}</h3><p className="text-xs text-slate-400">{t.newDesc}</p></div>
+                    <div><h3 className="font-bold text-slate-800">{t.newTemplate}</h3><p className="text-xs text-slate-400">{t.newDesc}</p></div>
                 </button>
             </div>
 
